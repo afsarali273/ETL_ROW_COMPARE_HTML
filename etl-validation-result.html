@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ETL Data Validation Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0a0a0a;
+            color: #e5e5e5;
+            line-height: 1.6;
+        }
+
+        .dashboard {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 24px;
+        }
+
+        .header {
+            margin-bottom: 32px;
+        }
+
+        .header h1 {
+            font-size: 32px;
+            font-weight: 700;
+            color: #ffffff;
+            margin-bottom: 8px;
+        }
+
+        .header p {
+            color: #a1a1aa;
+            font-size: 16px;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-bottom: 32px;
+        }
+
+        .stat-card {
+            background: #111111;
+            border: 1px solid #262626;
+            border-radius: 12px;
+            padding: 20px;
+            transition: border-color 0.2s;
+        }
+
+        .stat-card:hover {
+            border-color: #404040;
+        }
+
+        .stat-value {
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+
+        .stat-label {
+            color: #a1a1aa;
+            font-size: 14px;
+        }
+
+        .stat-critical { color: #ef4444; }
+        .stat-warning { color: #f59e0b; }
+        .stat-success { color: #10b981; }
+        .stat-info { color: #3b82f6; }
+
+        .controls {
+            display: flex;
+            gap: 16px;
+            margin-bottom: 24px;
+            flex-wrap: wrap;
+        }
+
+        .search-input {
+            background: #111111;
+            border: 1px solid #262626;
+            border-radius: 8px;
+            padding: 12px 16px;
+            color: #e5e5e5;
+            font-size: 14px;
+            min-width: 300px;
+        }
+
+        .search-input:focus {
+            outline: none;
+            border-color: #3b82f6;
+        }
+
+        .filter-select {
+            background: #111111;
+            border: 1px solid #262626;
+            border-radius: 8px;
+            padding: 12px 16px;
+            color: #e5e5e5;
+            font-size: 14px;
+            cursor: pointer;
+        }
+
+        .table-container {
+            background: #111111;
+            border: 1px solid #262626;
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        .table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .table th {
+            background: #1a1a1a;
+            padding: 16px;
+            text-align: left;
+            font-weight: 600;
+            color: #ffffff;
+            border-bottom: 1px solid #262626;
+        }
+
+        .table td {
+            padding: 16px;
+            border-bottom: 1px solid #1a1a1a;
+            vertical-align: top;
+        }
+
+        .table tr:hover {
+            background: #0f0f0f;
+        }
+
+        .record-row {
+            cursor: pointer;
+        }
+
+        .record-id {
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 13px;
+            color: #3b82f6;
+        }
+
+        .issue-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 500;
+            margin-right: 8px;
+            margin-bottom: 4px;
+        }
+
+        .badge-missing { background: #7f1d1d; color: #fca5a5; }
+        .badge-different { background: #92400e; color: #fbbf24; }
+        .badge-format { background: #1e40af; color: #93c5fd; }
+        .badge-precision { background: #7c2d12; color: #fdba74; }
+
+        .progress-bar {
+            width: 100%;
+            height: 6px;
+            background: #262626;
+            border-radius: 3px;
+            overflow: hidden;
+            margin-top: 8px;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #ef4444, #f59e0b);
+            transition: width 0.3s;
+        }
+
+        .expand-icon {
+            transition: transform 0.2s;
+            color: #a1a1aa;
+        }
+
+        .expanded .expand-icon {
+            transform: rotate(90deg);
+        }
+
+        .details-row {
+            display: none;
+            background: #0a0a0a;
+        }
+
+        .details-row.show {
+            display: table-row;
+        }
+
+        .details-content {
+            padding: 24px;
+            border-top: 1px solid #262626;
+        }
+
+        .field-comparison {
+            display: grid;
+            grid-template-columns: 200px 1fr 1fr 200px;
+            gap: 16px;
+            align-items: center;
+            padding: 12px 0;
+            border-bottom: 1px solid #1a1a1a;
+        }
+
+        .field-comparison:last-child {
+            border-bottom: none;
+        }
+
+        .field-name {
+            font-weight: 600;
+            color: #ffffff;
+            font-size: 14px;
+        }
+
+        .field-value {
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 13px;
+            padding: 8px 12px;
+            border-radius: 6px;
+            background: #1a1a1a;
+            border: 1px solid #262626;
+        }
+
+        .field-value.source {
+            border-left: 3px solid #ef4444;
+        }
+
+        .field-value.target {
+            border-left: 3px solid #10b981;
+        }
+
+        .difference-type {
+            font-size: 12px;
+            color: #a1a1aa;
+            text-align: center;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        @media (max-width: 768px) {
+            .controls {
+                flex-direction: column;
+            }
+            
+            .search-input {
+                min-width: 100%;
+            }
+            
+            .field-comparison {
+                grid-template-columns: 1fr;
+                gap: 8px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard">
+        <div class="header">
+            <h1>ETL Data Validation</h1>
+            <p>Showing only records with discrepancies - 847 issues found across 2.3M records</p>
+        </div>
+
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-value stat-critical">847</div>
+                <div class="stat-label">Total Discrepancies</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value stat-warning">623</div>
+                <div class="stat-label">Value Differences</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value stat-critical">156</div>
+                <div class="stat-label">Missing Records</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value stat-info">68</div>
+                <div class="stat-label">Format Issues</div>
+            </div>
+        </div>
+
+        <div class="controls">
+            <input type="text" class="search-input" placeholder="Search by Record ID, Field Name, or Value..." id="searchInput">
+            <select class="filter-select" id="issueFilter">
+                <option value="all">All Issues</option>
+                <option value="missing">Missing Records</option>
+                <option value="different">Value Differences</option>
+                <option value="format">Format Issues</option>
+                <option value="precision">Precision Issues</option>
+            </select>
+        </div>
+
+        <div class="table-container">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th style="width: 40px;"></th>
+                        <th>Record ID</th>
+                        <th>Issue Summary</th>
+                        <th>Fields Affected</th>
+                        <th>Severity</th>
+                    </tr>
+                </thead>
+                <tbody id="tableBody">
+                     Records will be populated by JavaScript 
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        // Sample data representing ETL comparison results
+        const discrepantRecords = [
+            {
+                id: 'USR_001234',
+                issues: ['Value Difference', 'Format Issue'],
+                fieldsAffected: 8,
+                totalFields: 50,
+                severity: 'High',
+                fields: [
+                    { name: 'email', source: 'john.doe@company.com', target: 'john.doe@newcompany.com', type: 'Value Difference' },
+                    { name: 'phone', source: '(555) 123-4567', target: '555-123-4567', type: 'Format Issue' },
+                    { name: 'salary', source: '75000.00', target: '75000.0', type: 'Precision Issue' },
+                    { name: 'department', source: 'Engineering', target: 'ENGINEERING', type: 'Case Difference' },
+                    { name: 'hire_date', source: '2023-01-15', target: '01/15/2023', type: 'Format Issue' },
+                    { name: 'status', source: 'Active', target: 'ACTIVE', type: 'Case Difference' },
+                    { name: 'manager_id', source: 'MGR_456', target: 'MGR_789', type: 'Value Difference' },
+                    { name: 'location', source: 'New York', target: 'New York, NY', type: 'Value Difference' }
+                ]
+            },
+            {
+                id: 'USR_001235',
+                issues: ['Missing Record'],
+                fieldsAffected: 50,
+                totalFields: 50,
+                severity: 'Critical',
+                fields: [
+                    { name: 'All Fields', source: 'Present', target: 'MISSING', type: 'Missing Record' }
+                ]
+            },
+            {
+                id: 'USR_001236',
+                issues: ['Value Difference'],
+                fieldsAffected: 3,
+                totalFields: 50,
+                severity: 'Medium',
+                fields: [
+                    { name: 'last_login', source: '2024-01-15 14:30:00', target: '2024-01-15T14:30:00Z', type: 'Format Issue' },
+                    { name: 'account_balance', source: '1250.50', target: '1250.5', type: 'Precision Issue' },
+                    { name: 'preferences', source: '{"theme":"dark"}', target: '{"theme": "dark"}', type: 'Whitespace Difference' }
+                ]
+            },
+            {
+                id: 'USR_001237',
+                issues: ['Value Difference', 'Precision Issue'],
+                fieldsAffected: 12,
+                totalFields: 50,
+                severity: 'High',
+                fields: [
+                    { name: 'first_name', source: 'Sarah', target: 'Sara', type: 'Value Difference' },
+                    { name: 'commission_rate', source: '0.15000', target: '0.15', type: 'Precision Issue' },
+                    { name: 'address', source: '123 Main St, Apt 4B', target: '123 Main Street, Apartment 4B', type: 'Value Difference' },
+                    { name: 'zip_code', source: '10001', target: '10001-1234', type: 'Value Difference' },
+                    { name: 'birth_date', source: '1990-05-20', target: '05/20/1990', type: 'Format Issue' },
+                    { name: 'emergency_contact', source: 'Jane Doe (555) 987-6543', target: 'Jane Doe 555-987-6543', type: 'Format Issue' },
+                    { name: 'skills', source: 'Java,Python,SQL', target: 'Java, Python, SQL', type: 'Format Issue' },
+                    { name: 'certification_date', source: '2023-06-15', target: '2023-06-15T00:00:00', type: 'Format Issue' },
+                    { name: 'performance_score', source: '4.75', target: '4.8', type: 'Value Difference' },
+                    { name: 'team_lead', source: 'true', target: '1', type: 'Type Difference' },
+                    { name: 'vacation_days', source: '15', target: '15.0', type: 'Type Difference' },
+                    { name: 'notes', source: 'Excellent performer', target: 'Excellent performer.', type: 'Punctuation Difference' }
+                ]
+            }
+        ];
+
+        function renderTable(records = discrepantRecords) {
+            const tbody = document.getElementById('tableBody');
+            tbody.innerHTML = '';
+
+            records.forEach(record => {
+                // Main row
+                const row = document.createElement('tr');
+                row.className = 'record-row';
+                row.onclick = () => toggleDetails(record.id);
+                
+                const progressPercentage = (record.fieldsAffected / record.totalFields) * 100;
+                
+                row.innerHTML = `
+                    <td>
+                        <span class="expand-icon">▶</span>
+                    </td>
+                    <td>
+                        <div class="record-id">${record.id}</div>
+                    </td>
+                    <td>
+                        ${record.issues.map(issue => {
+                            const badgeClass = issue.includes('Missing') ? 'badge-missing' : 
+                                             issue.includes('Format') ? 'badge-format' :
+                                             issue.includes('Precision') ? 'badge-precision' : 'badge-different';
+                            return `<span class="issue-badge ${badgeClass}">${issue}</span>`;
+                        }).join('')}
+                    </td>
+                    <td>
+                        <div>${record.fieldsAffected} of ${record.totalFields} fields</div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: ${progressPercentage}%"></div>
+                        </div>
+                    </td>
+                    <td>
+                        <span class="issue-badge ${record.severity === 'Critical' ? 'badge-missing' : 
+                                                   record.severity === 'High' ? 'badge-different' : 'badge-format'}">${record.severity}</span>
+                    </td>
+                `;
+                
+                tbody.appendChild(row);
+
+                // Details row
+                const detailsRow = document.createElement('tr');
+                detailsRow.className = 'details-row';
+                detailsRow.id = `details-${record.id}`;
+                
+                const detailsContent = record.fields.map(field => `
+                    <div class="field-comparison">
+                        <div class="field-name">${field.name}</div>
+                        <div class="field-value source">${field.source}</div>
+                        <div class="field-value target">${field.target}</div>
+                        <div class="difference-type">${field.type}</div>
+                    </div>
+                `).join('');
+                
+                detailsRow.innerHTML = `
+                    <td colspan="5">
+                        <div class="details-content">
+                            <h3 style="margin-bottom: 16px; color: #ffffff;">Field-by-Field Comparison</h3>
+                            ${detailsContent}
+                        </div>
+                    </td>
+                `;
+                
+                tbody.appendChild(detailsRow);
+            });
+        }
+
+        function toggleDetails(recordId) {
+            const detailsRow = document.getElementById(`details-${recordId}`);
+            const expandIcon = event.currentTarget.querySelector('.expand-icon');
+            
+            if (detailsRow.classList.contains('show')) {
+                detailsRow.classList.remove('show');
+                event.currentTarget.classList.remove('expanded');
+            } else {
+                // Close all other details
+                document.querySelectorAll('.details-row').forEach(row => row.classList.remove('show'));
+                document.querySelectorAll('.record-row').forEach(row => row.classList.remove('expanded'));
+                
+                detailsRow.classList.add('show');
+                event.currentTarget.classList.add('expanded');
+            }
+        }
+
+        function filterRecords() {
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+            const issueFilter = document.getElementById('issueFilter').value;
+            
+            let filteredRecords = discrepantRecords;
+            
+            if (issueFilter !== 'all') {
+                filteredRecords = filteredRecords.filter(record => {
+                    return record.issues.some(issue => issue.toLowerCase().includes(issueFilter));
+                });
+            }
+            
+            if (searchTerm) {
+                filteredRecords = filteredRecords.filter(record => {
+                    return record.id.toLowerCase().includes(searchTerm) ||
+                           record.fields.some(field => 
+                               field.name.toLowerCase().includes(searchTerm) ||
+                               field.source.toLowerCase().includes(searchTerm) ||
+                               field.target.toLowerCase().includes(searchTerm)
+                           );
+                });
+            }
+            
+            renderTable(filteredRecords);
+        }
+
+        // Event listeners
+        document.getElementById('searchInput').addEventListener('input', filterRecords);
+        document.getElementById('issueFilter').addEventListener('change', filterRecords);
+
+        // Initial render
+        renderTable();
+    </script>
+</body>
+</html>
